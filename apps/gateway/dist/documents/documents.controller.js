@@ -33,7 +33,7 @@ let DocumentsController = class DocumentsController {
         await this.queue.publishIngestion({
             jobId,
             documentId,
-            filePath: file.path,
+            filePath: (0, path_1.resolve)(file.path),
             filename: file.originalname,
         });
         return { jobId, documentId, status: 'processing' };

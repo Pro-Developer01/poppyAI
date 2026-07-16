@@ -4,7 +4,7 @@ import {
 import { FileInterceptor } from '@nestjs/platform-express';
 import { diskStorage } from 'multer';
 import { randomUUID } from 'crypto';
-import { extname } from 'path';
+import { extname, resolve } from 'path';
 import { QueueService } from '../queue/queue.service';
 import { JobsService } from '../jobs/jobs.service';
 
@@ -33,7 +33,7 @@ export class DocumentsController {
         await this.queue.publishIngestion({
             jobId,
             documentId,
-            filePath: file.path,
+            filePath: resolve(file.path),
             filename: file.originalname,
         });
 
