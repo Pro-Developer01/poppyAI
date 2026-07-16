@@ -1,0 +1,31 @@
+services:
+  rabbitmq:
+    image: rabbitmq:3-management
+    ports:
+      - "5672:5672"     # AMQP (app will connect)
+      - "15672:15672"   # management UI (browser: localhost:15672, guest/guest)
+    volumes:
+      - rabbitmq_data:/var/lib/rabbitmq
+
+  qdrant:
+    image: qdrant/qdrant
+    ports:
+      - "6333:6333"     # REST + dashboard: localhost:6333/dashboard
+    volumes:
+      - qdrant_data:/qdrant/storage
+
+  postgres:
+    image: postgres:16
+    environment:
+      POSTGRES_PASSWORD: postgres
+      POSTGRES_DB: docs
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+      - ../db/init.sql:/docker-entrypoint-initdb.d/init.sql   # runs on first boot
+
+volumes:
+  rabbitmq_data:
+  qdrant_data:
+  postgres_data:
