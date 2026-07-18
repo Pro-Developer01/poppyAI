@@ -29,3 +29,15 @@ def generate_answer(question: str, contexts: list[dict]) -> str:
         temperature=0.1,   # factual Q&A ke liye low temperature
     )
     return resp.choices[0].message.content
+
+
+def complete(system: str, user: str, temperature: float = 0.0) -> str:
+    resp = _client.chat.completions.create(
+        model=settings.chat_model,
+        messages=[
+            {"role": "system", "content": system},
+            {"role": "user",   "content": user},
+        ],
+        temperature=temperature,
+    )
+    return resp.choices[0].message.content.strip()
