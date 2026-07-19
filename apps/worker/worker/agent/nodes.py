@@ -14,6 +14,7 @@ ROUTE_SYSTEM = (
     "rag    - answerable from the user's uploaded documents (invoices, reports, contracts, data)\n"
     "web    - needs current/external information not in private documents\n"
     "direct - greeting, chit-chat, or about this assistant itself\n"
+    "complex - comparison or multi-part question needing multiple lookups\n"
     "Reply with only the single word."
 )
 
@@ -107,3 +108,53 @@ def web_search(state: AgentState) -> AgentState:
         for i, r in enumerate(results)
     ]
     return {"contexts": contexts}
+
+# ---------- 7. PLAN ----------
+PLAN_SYSTEM = (
+    "Decide if the question needs to be broken into sub-questions "
+    "(e.g. comparisons, multi-part questions). If it is simple, return a JSON "
+    'array with the question as-is: ["<question>"]. If complex, return 2-4 '
+    "self-contained sub-questions as a JSON array. Return ONLY the JSON array."
+)
+
+@observe()
+def plan(state: AgentState) -> AgentState:
+    raw = complete(PLAN_SYSTEM, state["question"])
+    try:
+        subs = json.loads(raw)
+        assert isinstance(subs, list) and all(isinstance(s, str) for s in subs)
+    except Exception:
+        subs = [state["question"]]        # parse fail -> single-shot fallback
+    return {"sub_questions": subs[:4], "sub_results": []}
+
+# ---------- 8. EXECUTE (ek sub-question per pass — loop graph karega) ----------
+@observe()
+def execute_sub(state: AgentState) -> AgentState:
+    done = len(state["sub_results"])
+    sub_q = state["sub_questions"][done]
+    qvec = embed_query(sub_q)
+    hits = search(qvec, state.get("top_k", 5), state.get("document_id"))
+    contexts = [
+        {"text": h.payload["text"], "filename": h.payload.get("filename"),
+         "chunk_index": h.payload.get("chunk_index"),
+         "document_id": h.payload["document_id"], "score": h.score}
+        for h in hits
+    ]
+    return {"sub_results": state["sub_results"] + [{"question": sub_q,
+                                                    "contexts": contexts}]}
+
+# ---------- 9. COMBINE ----------
+@observe()
+def combine(state: AgentState) -> AgentState:
+    all_contexts = []
+    for r in state["sub_results"]:
+        all_contexts.extend(r["contexts"])
+    # dedupe (same chunk do sub-questions se aa sakta hai)
+    seen, unique = set(), []
+    for c in all_contexts:
+        key = (c["document_id"], c["chunk_index"])
+        if key not in seen:
+            seen.add(key)
+            unique.append(c)
+    answer = generate_answer(state["question"], unique[:10])
+    return {"answer": answer, "contexts": unique[:10]}

@@ -3,7 +3,7 @@ from .state import AgentState
 from . import nodes
 
 def _after_route(state: AgentState) -> str:
-    return state["route"]                       # "rag" | "web" | "direct"
+    return state["route"]                       # "rag" | "web" | "direct" | "complex"
 
 def _after_grade(state: AgentState) -> str:
     if state["relevant"]:
@@ -22,18 +22,34 @@ def build_graph():
     g.add_node("web_search",    nodes.web_search)
     g.add_node("generate",      nodes.generate)
     g.add_node("direct_answer", nodes.direct_answer)
+    g.add_node("plan",        nodes.plan)
+    g.add_node("execute_sub", nodes.execute_sub)
+    g.add_node("combine",     nodes.combine)
 
     g.add_edge(START, "route")
     g.add_conditional_edges("route", _after_route, {
         "rag":    "retrieve",
         "web":    "web_search",
         "direct": "direct_answer",
+        "complex": "plan",
     })
+    def _after_execute(state) -> str:
+        if len(state["sub_results"]) < len(state["sub_questions"]):
+            return "execute_sub"       # agla sub-question (loop)
+        return "combine"
+
     g.add_edge("retrieve", "grade")
     g.add_conditional_edges("grade", _after_grade, {
         "generate": "generate",
         "rewrite":  "rewrite",
     })
+    g.add_edge("plan", "execute_sub")
+
+    g.add_conditional_edges("execute_sub", _after_execute, {
+        "execute_sub": "execute_sub",
+        "combine":     "combine",
+    })
+    g.add_edge("combine", END)
     g.add_edge("rewrite", "retrieve")        # <-- YAHI loop hai (cycle)
     g.add_edge("web_search", "generate")
     g.add_edge("generate", END)
