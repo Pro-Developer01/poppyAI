@@ -41,3 +41,24 @@ def complete(system: str, user: str, temperature: float = 0.0) -> str:
         temperature=temperature,
     )
     return resp.choices[0].message.content.strip()
+
+
+def stream_answer(question: str, contexts: list[dict]):
+    blocks = [
+        f"[{i}] (from {c.get('filename')}, chunk {c.get('chunk_index')}):\n{c['text']}"
+        for i, c in enumerate(contexts, start=1)
+    ]
+    context_text = "\n\n".join(blocks)
+    
+    user = (f"Context:\n" + context_text +f"\n\nQuestion: {question}\n\nAnswer with inline [n] citations.")
+    stream = _client.chat.completions.create(
+        model=settings.chat_model,
+        messages=[{"role": "system", "content": SYSTEM},
+                  {"role": "user",   "content": user}],
+        temperature=0.1,
+        stream=True,                      # <-- token-by-token
+    )
+    for chunk in stream:
+        delta = chunk.choices[0].delta.content
+        if delta:
+            yield delta
