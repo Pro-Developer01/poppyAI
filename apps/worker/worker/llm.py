@@ -1,4 +1,4 @@
-from openai import OpenAI
+from langfuse.openai import OpenAI 
 from .config import settings
 
 _client = OpenAI(api_key=settings.llm_api_key, base_url=settings.llm_base_url)
@@ -49,7 +49,7 @@ def stream_answer(question: str, contexts: list[dict]):
         for i, c in enumerate(contexts, start=1)
     ]
     context_text = "\n\n".join(blocks)
-    
+
     user = (f"Context:\n" + context_text +f"\n\nQuestion: {question}\n\nAnswer with inline [n] citations.")
     stream = _client.chat.completions.create(
         model=settings.chat_model,

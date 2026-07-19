@@ -3,6 +3,8 @@ from ..embeddings import embed_query
 from ..vectorstore import search
 from ..llm import complete, generate_answer
 from .state import AgentState
+from langfuse import observe
+from ..mcp_client import call_tool
 
 MAX_ATTEMPTS = 2
 
@@ -15,6 +17,7 @@ ROUTE_SYSTEM = (
     "Reply with only the single word."
 )
 
+@observe
 def route(state: AgentState) -> AgentState:
     label = complete(ROUTE_SYSTEM, state["question"]).lower()
     if label not in ("rag", "web", "direct"):
@@ -22,6 +25,7 @@ def route(state: AgentState) -> AgentState:
     return {"route": label, "query": state["question"], "attempts": 0}
 
 # ---------- 2. RETRIEVE (Chapter 2 reuse) ----------
+@observe
 def retrieve(state: AgentState) -> AgentState:
     qvec = embed_query(state["query"])
     hits = search(qvec, state.get("top_k", 5), state.get("document_id"))
@@ -43,7 +47,7 @@ GRADE_SYSTEM = (
     "answer 'yes' if the snippets contain enough information to answer the question, "
     "otherwise 'no'. Reply with only yes or no."
 )
-
+@observe    
 def grade(state: AgentState) -> AgentState:
     snippets = "\n---\n".join(c["text"][:500] for c in state["contexts"][:5])
     verdict = complete(GRADE_SYSTEM,
@@ -56,6 +60,7 @@ REWRITE_SYSTEM = (
     "inside business documents. Keep it short. Reply with only the rewritten query."
 )
 
+@observe
 def rewrite(state: AgentState) -> AgentState:
     new_q = complete(REWRITE_SYSTEM,
                      f"Original question: {state['question']}\n"
@@ -63,6 +68,7 @@ def rewrite(state: AgentState) -> AgentState:
     return {"query": new_q}
 
 # ---------- 5. WEB SEARCH (Phase 2 stub -> Phase 3 mein MCP tool) ----------
+@observe    
 def web_search(state: AgentState) -> AgentState:
     # Yahan koi bhi search API laga sakte ho (Tavily / Brave / SerpAPI).
     # Phase 2 mein hum ise saaf-saaf stub rakhte hain; MCP-based tool Phase 3 mein.
@@ -72,13 +78,32 @@ def web_search(state: AgentState) -> AgentState:
     }]}
 
 # ---------- 6. GENERATE / DIRECT ----------
+@observe
 def generate(state: AgentState) -> AgentState:
     answer = generate_answer(state["question"], state["contexts"])  # Chapter 2 reuse
     return {"answer": answer}
 
+@observe
 def direct_answer(state: AgentState) -> AgentState:
     answer = complete(
         "You are a helpful document-intelligence assistant. Answer briefly.",
         state["question"], temperature=0.5,
     )
     return {"answer": answer, "contexts": []}
+
+
+@observe()
+def web_search(state: AgentState) -> AgentState:
+    raw = call_tool("web_search", {"query": state["query"], "max_results": 3})
+    results = json.loads(raw)
+    contexts = [
+        {
+            "text":        r["content"],
+            "filename":    r["url"],          # citation = URL
+            "chunk_index": i,
+            "document_id": "web",
+            "score":       0.0,
+        }
+        for i, r in enumerate(results)
+    ]
+    return {"contexts": contexts}
