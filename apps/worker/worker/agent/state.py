@@ -10,3 +10,5 @@ class AgentState(TypedDict, total=False):
     answer:    str
     document_id: str | None
     top_k:     int
+    sub_questions: list[str]      # planner ka output
+    sub_results:   list[dict]     # har sub-question ka {question, contexts}

@@ -1,0 +1,25 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: web
+  namespace: doc-intel
+spec:
+  replicas: 1
+  selector:
+    matchLabels: { app: web }
+  template:
+    metadata:
+      labels: { app: web }
+    spec:
+      containers:
+        - name: web
+          image: doc-intel/web:dev
+          imagePullPolicy: IfNotPresent
+          env:
+            - name: GATEWAY_URL
+              valueFrom:
+                configMapKeyRef: { name: app-config, key: GATEWAY_URL }
+          ports: [{ containerPort: 3000 }]
+          resources:
+            requests: { cpu: 50m, memory: 128Mi }
+            limits:   { cpu: 250m, memory: 256Mi }
