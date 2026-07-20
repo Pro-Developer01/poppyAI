@@ -10,3 +10,8 @@ pandas
 openpyxl
 pydantic
 python-dotenv
+langgraph
+langfuse
+mcp[cli]
+tavily-python
+ragas

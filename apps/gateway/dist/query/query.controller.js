@@ -27,6 +27,29 @@ let QueryController = class QueryController {
         });
         return res.json();
     }
+    async stream(body, res) {
+        const upstream = await fetch(`${process.env.WORKER_URL}/query/stream`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+                question: body.question,
+                document_id: body.documentId,
+                top_k: body.topK ?? 5,
+            }),
+        });
+        res.setHeader('Content-Type', 'text/event-stream');
+        res.setHeader('Cache-Control', 'no-cache');
+        res.setHeader('Connection', 'keep-alive');
+        const reader = upstream.body.getReader();
+        const pump = async () => {
+            const { done, value } = await reader.read();
+            if (done)
+                return res.end();
+            res.write(Buffer.from(value));
+            return pump();
+        };
+        await pump().catch(() => res.end());
+    }
 };
 exports.QueryController = QueryController;
 __decorate([
@@ -36,6 +59,14 @@ __decorate([
     __metadata("design:paramtypes", [Object]),
     __metadata("design:returntype", Promise)
 ], QueryController.prototype, "query", null);
+__decorate([
+    (0, common_1.Post)('query/stream'),
+    __param(0, (0, common_1.Body)()),
+    __param(1, (0, common_1.Res)()),
+    __metadata("design:type", Function),
+    __metadata("design:paramtypes", [Object, Object]),
+    __metadata("design:returntype", Promise)
+], QueryController.prototype, "stream", null);
 exports.QueryController = QueryController = __decorate([
     (0, common_1.Controller)()
 ], QueryController);
