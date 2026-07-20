@@ -1,0 +1,29 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: worker-consumer
+  namespace: doc-intel
+spec:
+  replicas: 1                        # KEDA isi ko scale karega (Section 6.5)
+  selector:
+    matchLabels: { app: worker-consumer }
+  template:
+    metadata:
+      labels: { app: worker-consumer }
+    spec:
+      containers:
+        - name: worker-consumer
+          image: doc-intel/worker:dev
+          imagePullPolicy: IfNotPresent
+          command: ["python", "-m", "worker.consumer"]
+          envFrom:
+            - configMapRef: { name: app-config }
+            - secretRef:    { name: app-secrets }
+          volumeMounts:
+            - { name: uploads, mountPath: /data/uploads }
+          resources:
+            requests: { cpu: 100m, memory: 256Mi }
+            limits:   { cpu: 1, memory: 1Gi }
+      volumes:
+        - name: uploads
+          persistentVolumeClaim: { claimName: uploads-pvc }

@@ -3,11 +3,21 @@ services:
     image: rabbitmq:3-management
     ports: ["5672:5672", "15672:15672"]
     volumes: [rabbitmq_data:/var/lib/rabbitmq]
+    healthcheck:
+      test: ["CMD", "rabbitmq-diagnostics", "-q", "ping"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
 
   qdrant:
     image: qdrant/qdrant
     ports: ["6333:6333"]
     volumes: [qdrant_data:/qdrant/storage]
+    healthcheck:
+      test: ["CMD-SHELL", "bash -c '</dev/tcp/127.0.0.1/6333'"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
 
   postgres:
     image: postgres:16
@@ -17,6 +27,11 @@ services:
     volumes:
       - postgres_data:/var/lib/postgresql/data
       - ../db/init.sql:/docker-entrypoint-initdb.d/init.sql
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
 
   worker-api:
     image: doc-intel/worker:dev
@@ -28,14 +43,22 @@ services:
       LANGFUSE_PUBLIC_KEY: ${LANGFUSE_PUBLIC_KEY}
       LANGFUSE_SECRET_KEY: ${LANGFUSE_SECRET_KEY}
       TAVILY_API_KEY: ${TAVILY_API_KEY}
-    depends_on: [qdrant, rabbitmq, postgres]
+    depends_on:
+      qdrant: { condition: service_healthy }
+      rabbitmq: { condition: service_healthy }
+      postgres: { condition: service_healthy }
+    restart: on-failure
 
   worker-consumer:
     image: doc-intel/worker:dev
     command: ["python", "-m", "worker.consumer"]     # <- command override
     environment: *worker-env
     volumes: [uploads:/data/uploads]
-    depends_on: [rabbitmq, postgres, qdrant]
+    depends_on:
+      rabbitmq: { condition: service_healthy }
+      postgres: { condition: service_healthy }
+      qdrant: { condition: service_healthy }
+    restart: on-failure
 
   gateway:
     image: doc-intel/gateway:dev
@@ -46,7 +69,10 @@ services:
       UPLOAD_DIR: /data/uploads
     ports: ["3000:3000"]
     volumes: [uploads:/data/uploads]
-    depends_on: [rabbitmq, postgres]
+    depends_on:
+      rabbitmq: { condition: service_healthy }
+      postgres: { condition: service_healthy }
+    restart: on-failure
 
   web:
     image: doc-intel/web:dev
@@ -54,6 +80,7 @@ services:
       GATEWAY_URL: http://gateway:3000
     ports: ["3001:3000"]
     depends_on: [gateway]
+    restart: on-failure
 
 volumes:
   rabbitmq_data:

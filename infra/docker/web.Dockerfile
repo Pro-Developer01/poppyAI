@@ -3,6 +3,8 @@ WORKDIR /app
 COPY apps/web/package*.json ./
 RUN npm ci
 COPY apps/web .
+ARG GATEWAY_URL
+ENV GATEWAY_URL=$GATEWAY_URL
 RUN npm run build
 
 FROM node:20-slim
