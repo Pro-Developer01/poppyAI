@@ -1,4 +1,30 @@
 # poppyAI
+
+# PoppyAI — Agentic Document Intelligence Platform
+
+Upload your documents. Ask questions. Get answers with citations back to the exact source.
+
+PoppyAI is a production-shaped RAG system, not a notebook demo. A LangGraph agent
+decides how to answer each question — search your documents, search the web, or
+break a complex question into sub-questions — then grades what it retrieved and
+rewrites its own query if the results are weak.
+
+It's built as a polyglot system on purpose: a NestJS gateway handles uploads and
+API traffic, a Python/FastAPI worker does the AI work, and RabbitMQ sits between
+them so a 200-page PDF doesn't block a web request.
+
+**What makes it different from a "chat with your PDF" demo:**
+- Every agent step is traced with Langfuse
+- Answer quality is scored with Ragas (faithfulness, relevancy, context precision)
+  against a golden dataset — so changes can be measured, not guessed
+- Two-level caching (exact + semantic) to keep token costs down
+- Custom MCP server exposing tools to the agent
+- Kubernetes manifests with proper stateful/stateless separation
+
+
+
+
+
 #How to start the Project
 
 cd infra/compose
